@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISSOT - Dirección de Salud Sotillo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        medical: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .dark .glass { background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .sidebar-item.active { background: linear-gradient(to right, #0ea5e9, #0284c7); color: white; }
+        #map { height: 400px; border-radius: 1rem; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col sticky top-0 h-screen transition-all duration-300">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-10 h-10 bg-medical-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-medical-200 dark:shadow-none">
+                <i class="fas fa-heartbeat"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">SISSOT</h1>
+                <p class="text-xs text-slate-500">Salud Sotillo</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 px-4 py-2 space-y-1">
+            <a href="#" onclick="showSection('dashboard')" id="nav-dashboard" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i class="fas fa-chart-line"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+            <a href="#" onclick="showSection('patients')" id="nav-patients" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i class="fas fa-user-injured"></i>
+                <span class="font-medium">Pacientes</span>
+            </a>
+            <a href="#" onclick="showSection('map')" id="nav-map" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i class="fas fa-map-marked-alt"></i>
+                <span class="font-medium">Mapa Epidemiológico</span>
+            </a>
+            <a href="#" onclick="showSection('alerts')" id="nav-alerts" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i class="fas fa-bell text-warning"></i>
+                <span class="font-medium">Alertas</span>
+            </a>
+            <a href="#" onclick="showSection('reports')" id="nav-reports" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
+                <i class="fas fa-file-export"></i>
+                <span class="font-medium">Reportes</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                <div class="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center overflow-hidden">
+                    <img src="https://ui-avatars.com/api/?name=Admin+Sotillo&background=0ea5e9&color=fff" alt="Avatar">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold truncate">Dr. Administrador</p>
+                    <p class="text-xs text-slate-500 truncate">Admin Sotillo</p>
+                </div>
+                <button onclick="toggleDarkMode()" class="p-2 text-slate-500 hover:text-medical-500">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:block"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 z-10">
+            <h2 id="section-title" class="text-xl font-bold">Dashboard General</h2>
+            <div class="flex items-center gap-4">
+                <div class="relative hidden sm:block">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" placeholder="Buscar paciente..." class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-full text-sm focus:ring-2 focus:ring-medical-500 w-64">
+                </div>
+                <button class="relative p-2 text-slate-500 hover:text-medical-500">
+                    <i class="fas fa-bell"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full border-2 border-white dark:border-slate-900"></span>
+                </button>
+                <button onclick="openPatientForm()" class="hidden sm:flex items-center gap-2 bg-medical-600 hover:bg-medical-700 text-white px-4 py-2 rounded-xl transition-all shadow-md shadow-medical-200 dark:shadow-none">
+                    <i class="fas fa-plus"></i>
+                    <span>Nuevo Registro</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Area -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <!-- DASHBOARD SECTION -->
+            <div id="section-dashboard" class="space-y-6">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 group hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-medical-50 dark:bg-medical-900/20 text-medical-600 rounded-xl">
+                                <i class="fas fa-users text-xl"></i>
+                            </div>
+                            <span class="text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-lg">+12%</span>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Pacientes Totales</h3>
+                        <p id="stat-patients" class="text-3xl font-bold mt-1">0</p>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 group hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-xl">
+                                <i class="fas fa-stethoscope text-xl"></i>
+                            </div>
+                            <span class="text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-lg">Estable</span>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Atenciones Hoy</h3>
+                        <p id="stat-today" class="text-3xl font-bold mt-1">24</p>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 group hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-600 rounded-xl">
+                                <i class="fas fa-biohazard text-xl"></i>
+                            </div>
+                            <span id="stat-alerts-badge" class="text-xs font-bold text-danger bg-danger/10 px-2 py-1 rounded-lg">0</span>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Alertas Activas</h3>
+                        <p id="stat-alerts" class="text-3xl font-bold mt-1">0</p>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 group hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-xl">
+                                <i class="fas fa-map-marker-alt text-xl"></i>
+                            </div>
+                            <span class="text-xs font-bold text-warning bg-warning/10 px-2 py-1 rounded-lg">Alta</span>
+                        </div>
+                        <h3 class="text-slate-500 text-sm font-medium">Comuna Crítica</h3>
+                        <p class="text-3xl font-bold mt-1 truncate">Pozuelos</p>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-bold">Tendencia Epidemiológica (7 días)</h3>
+                            <select class="text-xs bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1">
+                                <option>Última semana</option>
+                                <option>Último mes</option>
+                            </select>
+                        </div>
+                        <canvas id="trendChart" height="200"></canvas>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-bold">Patologías Frecuentes</h3>
+                            <button class="text-xs text-medical-600 font-semibold">Ver todas</button>
+                        </div>
+                        <canvas id="pathologyChart" height="200"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Activities & Alerts -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <h3 class="font-bold">Casos Recientes</h3>
+                            <button class="text-sm text-medical-600 hover:underline">Ver todos</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="px-6 py-3">Paciente</th>
+                                        <th class="px-6 py-3">Diagnóstico</th>
+                                        <th class="px-6 py-3">Comuna</th>
+                                        <th class="px-6 py-3">Riesgo</th>
+                                        <th class="px-6 py-3">Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-patients-table" class="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                                    <!-- Rows populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                        <h3 class="font-bold mb-4">Alertas Críticas</h3>
+                        <div id="alerts-container" class="space-y-4">
+                            <!-- Alerts populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PATIENTS SECTION -->
+            <div id="section-patients" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2 bg-medical-600 text-white rounded-xl shadow-md">Todos</button>
+                        <button class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50">Críticos</button>
+                        <button class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50">Por Comuna</button>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <table class="w-full text-left">
+                         <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 uppercase">
+                            <tr>
+                                <th class="px-6 py-3">Paciente</th>
+                                <th class="px-6 py-3">Cédula</th>
+                                <th class="px-6 py-3">Comuna</th>
+                                <th class="px-6 py-3">Patología</th>
+                                <th class="px-6 py-3">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patients-full-table" class="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MAP SECTION -->
+            <div id="section-map" class="hidden space-y-6 h-full">
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 h-full flex flex-col">
+                    <h3 class="font-bold mb-4">Mapa de Incidencia Epidemiológica - Sotillo</h3>
+                    <div id="map" class="flex-1 min-h-[500px]"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Patient Form Modal -->
+    <div id="patient-modal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm hidden z-50 items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <h3 class="text-xl font-bold">Registro de Paciente</h3>
+                <button onclick="closePatientForm()" class="text-slate-400 hover:text-danger"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <form id="patient-form" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Nombres</label>
+                        <input type="text" name="first_name" required class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Apellidos</label>
+                        <input type="text" name="last_name" required class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Cédula</label>
+                        <input type="text" name="dni" required class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Fecha Nacimiento</label>
+                        <input type="date" name="birth_date" required class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Comuna</label>
+                        <select name="commune_id" id="commune-select" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500">Sexo</label>
+                        <select name="gender" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500">
+                            <option value="M">Masculino</option>
+                            <option value="F">Femenino</option>
+                            <option value="O">Otro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500">Dirección Exacta</label>
+                    <textarea name="address" rows="2" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-medical-500"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" onclick="closePatientForm()" class="px-6 py-2 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-medical-600 text-white rounded-xl hover:bg-medical-700 shadow-lg shadow-medical-200 dark:shadow-none transition-all">Guardar Paciente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js" type="module"></script>
+</body>
+</html>
